@@ -8,28 +8,28 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
         :root { --bg: #0f172a; --board-dark: #769656; --board-light: #eeeed2; --accent: #fbbf24; }
-        body { background: var(--bg); color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 10px; touch-action: manipulation; }
-        #lobby { background: #1e293b; padding: 15px; border-radius: 10px; text-align: center; width: 90%; max-width: 320px; border: 1px solid var(--accent); margin-bottom: 15px; }
-        input { padding: 12px; border-radius: 5px; width: 80%; font-size: 16px; margin-bottom: 10px; }
-        button { background: var(--accent); color: #000; border: none; padding: 12px; border-radius: 5px; font-weight: bold; width: 85%; }
-        #board { display: grid; grid-template-columns: repeat(8, 11vw); grid-template-rows: repeat(8, 11vw); border: 4px solid #334155; }
+        body { background: var(--bg); color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 10px; overflow-x: hidden; }
+        #board { display: grid; grid-template-columns: repeat(8, 11vw); grid-template-rows: repeat(8, 11vw); border: 4px solid #334155; touch-action: none; }
         @media (min-width: 500px) { #board { grid-template-columns: repeat(8, 50px); grid-template-rows: repeat(8, 50px); } }
-        .sq { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+        .sq { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; position: relative; }
         .dark { background: var(--board-dark); }
         .light { background: var(--board-light); }
-        .piece { width: 80%; height: 80%; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.6); }
-        .white { background: #fff; } .black { background: #1a1a1a; }
-        .selected { outline: 3px solid var(--accent); box-shadow: 0 0 15px var(--accent); }
+        .piece { width: 85%; height: 85%; border-radius: 50%; pointer-events: none; }
+        .white { background: #fff; box-shadow: inset 0 -3px 5px #999; }
+        .black { background: #1a1a1a; box-shadow: inset 0 -3px 5px #000; }
+        .selected { border: 4px solid var(--accent) !important; box-sizing: border-box; }
+        #lobby { background: #1e293b; padding: 15px; border-radius: 10px; text-align: center; width: 90%; max-width: 320px; margin-bottom: 15px; }
+        button { background: var(--accent); border: none; padding: 12px; border-radius: 5px; font-weight: bold; width: 100%; cursor: pointer; }
+        input { padding: 12px; border-radius: 5px; width: 90%; margin-bottom: 10px; font-size: 16px; border: none; }
     </style>
 </head>
 <body>
     <div id="lobby">
-        <h2 style="margin:0 0 10px 0; color:var(--accent)">MOZDAMAS</h2>
         <input type="text" id="room-input" placeholder="Nome da Sala">
-        <button onclick="conectar()">ENTRAR NA SALA</button>
+        <button onclick="conectar()">JOGAR ONLINE</button>
     </div>
     <div id="board"></div>
-    <div id="msg" style="margin-top:10px; color:var(--accent); font-weight:bold;">TOCA NUMA PEÇA PARA MOVER</div>
+    <p id="msg" style="color:var(--accent); font-weight:bold;">Toca numa peça e depois no destino</p>
 
 <script>
     const firebaseConfig = {
@@ -55,44 +55,45 @@
             const r = Math.floor(i/8), c = i%8;
             const sq = document.createElement('div');
             sq.className = `sq ${(r+c)%2==0?'dark':'light'}`;
+            if(selectedSq === i) sq.classList.add('selected');
             
             if(p) {
                 const pDiv = document.createElement('div');
-                pDiv.className = `piece ${p.color == 'w' ? 'white' : 'black'} ${selectedSq === i ? 'selected' : ''}`;
-                pDiv.onclick = () => selectPiece(i);
+                pDiv.className = `piece ${p.color == 'w' ? 'white' : 'black'}`;
                 sq.appendChild(pDiv);
-            } else {
-                sq.onclick = () => moveHere(i);
             }
+            
+            // Evento de clique na casa (funciona para peça e espaço vazio)
+            sq.onclick = () => handleInteraction(i);
             bDiv.appendChild(sq);
         });
     }
 
-    function selectPiece(i) {
-        selectedSq = i;
-        render();
-    }
-
-    function moveHere(to) {
-        if (selectedSq !== null) {
-            board[to] = board[selectedSq];
+    function handleInteraction(i) {
+        if (board[i] !== null) {
+            // Se clicou numa peça, seleciona
+            selectedSq = i;
+        } else if (selectedSq !== null) {
+            // Se já tinha peça selecionada e clicou no vazio, move
+            board[i] = board[selectedSq];
             board[selectedSq] = null;
             selectedSq = null;
-            save();
+            if(roomID) db.ref('rooms/' + roomID).set({board: board});
         }
-    }
-
-    function save() {
-        if(roomID) db.ref('rooms/' + roomID).set({board: board});
+        render();
     }
 
     function conectar() {
         roomID = document.getElementById('room-input').value.trim().toLowerCase();
         if(!roomID) return;
         db.ref('rooms/' + roomID).on('value', s => {
-            const data = s.val();
-            if(data) { board = data.board; render(); }
-            else { initBoard(); save(); }
+            if(s.exists()) {
+                board = s.val().board;
+                render();
+            } else {
+                initBoard();
+                db.ref('rooms/' + roomID).set({board: board});
+            }
         });
     }
 
@@ -112,3 +113,4 @@
 </script>
 </body>
 </html>
+
