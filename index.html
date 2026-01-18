@@ -3,29 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>MOZDAMAS FINAL</title>
+    <title>MOZDAMAS V3</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
-        body { background: #0f172a; color: white; text-align: center; font-family: sans-serif; margin: 0; padding: 10px; }
-        #board { display: grid; grid-template-columns: repeat(8, 12vw); grid-template-rows: repeat(8, 12vw); border: 5px solid #334155; margin: 10px auto; width: fit-content; }
+        body { background: #0f172a; color: white; font-family: sans-serif; text-align: center; margin: 0; padding: 10px; }
+        #board { display: grid; grid-template-columns: repeat(8, 11vw); grid-template-rows: repeat(8, 11vw); border: 4px solid #334155; margin: 15px auto; width: fit-content; background: #334155; }
         @media (min-width: 500px) { #board { grid-template-columns: repeat(8, 50px); grid-template-rows: repeat(8, 50px); } }
         .sq { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
         .dark { background: #769656; } .light { background: #eeeed2; }
-        .piece { width: 80%; height: 80%; border-radius: 50%; border: 2px solid rgba(0,0,0,0.2); }
-        .white { background: #ffffff; } .black { background: #1a1a1a; }
+        .piece { width: 80%; height: 80%; border-radius: 50%; }
+        .white { background: #fff; box-shadow: 0 2px 4px #000; }
+        .black { background: #1a1a1a; box-shadow: 0 2px 4px #000; }
         .sel { outline: 4px solid #fbbf24; outline-offset: -4px; }
-        input { padding: 12px; border-radius: 5px; width: 70%; margin-bottom: 5px; }
-        button { background: #fbbf24; padding: 12px 20px; border: none; font-weight: bold; border-radius: 5px; }
+        input { padding: 12px; border-radius: 5px; width: 70%; margin-bottom: 10px; border: none; }
+        button { background: #fbbf24; padding: 12px; border: none; font-weight: bold; border-radius: 5px; width: 80%; }
     </style>
 </head>
 <body>
-    <div id="menu">
-        <input type="text" id="r" placeholder="Nome da sala">
-        <button onclick="con()">ENTRAR</button>
+    <div id="lobby">
+        <input type="text" id="room" placeholder="Nome da sala">
+        <button onclick="entrar()">JOGAR ONLINE</button>
     </div>
     <div id="board"></div>
-    <h3 id="m">Toca numa peça</h3>
+    <h3 id="msg">Aguardando sala...</h3>
 
 <script>
     const cfg = {
@@ -34,13 +35,14 @@
         projectId: "mozdamasonline",
         appId: "1:832141619024:web:1d46fcef9e2e37c0274655"
     };
-    firebase.initializeApp(cfg);
+    if (!firebase.apps.length) firebase.initializeApp(cfg);
     const db = firebase.database();
+    
     let b = Array(64).fill(null);
     let s = null; // Seleção
     let rId = '';
 
-    function draw() {
+    function render() {
         const div = document.getElementById('board');
         div.innerHTML = '';
         b.forEach((p, i) => {
@@ -49,7 +51,7 @@
             sq.className = `sq ${(row+col)%2==0?'dark':'light'} ${s===i?'sel':''}`;
             if(p) {
                 const pc = document.createElement('div');
-                pc.className = `piece ${p==='w'?'white':'black'}`;
+                pc.className = `piece ${p === 'w' ? 'white' : 'black'}`;
                 sq.appendChild(pc);
             }
             sq.onclick = () => clique(i);
@@ -59,40 +61,49 @@
 
     function clique(i) {
         if (b[i]) {
-            s = i; // Seleciona a peça
-            document.getElementById('m').innerText = "Destino?";
+            s = i;
+            document.getElementById('msg').innerText = "PEÇA SELECIONADA";
         } else if (s !== null) {
-            b[i] = b[s]; // Move para o vazio
+            b[i] = b[s];
             b[s] = null;
             s = null;
-            document.getElementById('m').innerText = "Movido!";
-            if(rId) db.ref('rooms/'+rId).set(b);
+            document.getElementById('msg').innerText = "MOVIDO!";
+            if(rId) db.ref('rooms/' + rId).set(b);
         }
-        draw();
+        render();
     }
 
-    function con() {
-        rId = document.getElementById('r').value.toLowerCase().trim();
+    function entrar() {
+        rId = document.getElementById('room').value.toLowerCase().trim();
         if(!rId) return;
-        db.ref('rooms/'+rId).on('value', snap => {
-            if(snap.exists()) { b = snap.val(); draw(); }
-            else { reset(); db.ref('rooms/'+rId).set(b); }
-            document.getElementById('m').innerText = "SALA: " + rId;
+        
+        // Listener para mudanças no Firebase
+        db.ref('rooms/' + rId).on('value', snap => {
+            const data = snap.val();
+            if (data && Array.isArray(data)) {
+                b = data;
+            } else {
+                resetBoard();
+                db.ref('rooms/' + rId).set(b);
+            }
+            render();
+            document.getElementById('msg').innerText = "SALA: " + rId;
         });
     }
 
-    function reset() {
+    function resetBoard() {
         b.fill(null);
         for(let i=0; i<64; i++) {
             let row = Math.floor(i/8), col = i%8;
             if((row+col)%2==0) {
-                if(row < 3) b[i] = 'black';
-                if(row > 4) b[i] = 'white';
+                if(row < 3) b[i] = 'b';
+                if(row > 4) b[i] = 'w';
             }
         }
-        draw();
     }
-    reset();
+
+    resetBoard(); // Inicia o tabuleiro na memória
+    render();     // Desenha o tabuleiro vazio logo no início
 </script>
 </body>
 </html>
