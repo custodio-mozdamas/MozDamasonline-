@@ -8,7 +8,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
         :root { --bg: #0f172a; --board-dark: #769656; --board-light: #eeeed2; --accent: #fbbf24; }
-        body { background: var(--bg); color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 10px; }
+        body { background: var(--bg); color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 10px; touch-action: manipulation; }
         #lobby { background: #1e293b; padding: 15px; border-radius: 10px; text-align: center; width: 90%; max-width: 320px; border: 1px solid var(--accent); margin-bottom: 15px; }
         input { padding: 12px; border-radius: 5px; width: 80%; font-size: 16px; margin-bottom: 10px; }
         button { background: var(--accent); color: #000; border: none; padding: 12px; border-radius: 5px; font-weight: bold; width: 85%; }
@@ -19,6 +19,7 @@
         .light { background: var(--board-light); }
         .piece { width: 80%; height: 80%; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.6); }
         .white { background: #fff; } .black { background: #1a1a1a; }
+        .selected { outline: 3px solid var(--accent); box-shadow: 0 0 15px var(--accent); }
     </style>
 </head>
 <body>
@@ -28,7 +29,7 @@
         <button onclick="conectar()">ENTRAR NA SALA</button>
     </div>
     <div id="board"></div>
-    <div id="msg" style="margin-top:10px; color:var(--accent); font-weight:bold;">SISTEMA PRONTO</div>
+    <div id="msg" style="margin-top:10px; color:var(--accent); font-weight:bold;">TOCA NUMA PEÇA PARA MOVER</div>
 
 <script>
     const firebaseConfig = {
@@ -44,36 +45,59 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     let board = Array(64).fill(null);
+    let selectedSq = null;
+    let roomID = '';
 
     function render() {
         const bDiv = document.getElementById('board');
-        if(!bDiv) return;
         bDiv.innerHTML = '';
-        for(let i=0; i<64; i++) {
+        board.forEach((p, i) => {
             const r = Math.floor(i/8), c = i%8;
             const sq = document.createElement('div');
             sq.className = `sq ${(r+c)%2==0?'dark':'light'}`;
-            if(board[i]) {
-                const p = document.createElement('div');
-                p.className = `piece ${board[i].color == 'w' ? 'white' : 'black'}`;
-                sq.appendChild(p);
+            
+            if(p) {
+                const pDiv = document.createElement('div');
+                pDiv.className = `piece ${p.color == 'w' ? 'white' : 'black'} ${selectedSq === i ? 'selected' : ''}`;
+                pDiv.onclick = () => selectPiece(i);
+                sq.appendChild(pDiv);
+            } else {
+                sq.onclick = () => moveHere(i);
             }
             bDiv.appendChild(sq);
+        });
+    }
+
+    function selectPiece(i) {
+        selectedSq = i;
+        render();
+    }
+
+    function moveHere(to) {
+        if (selectedSq !== null) {
+            board[to] = board[selectedSq];
+            board[selectedSq] = null;
+            selectedSq = null;
+            save();
         }
     }
 
+    function save() {
+        if(roomID) db.ref('rooms/' + roomID).set({board: board});
+    }
+
     function conectar() {
-        const room = document.getElementById('room-input').value.trim().toLowerCase();
-        if(!room) return alert("Escreve o nome da sala!");
-        document.getElementById('msg').innerText = "A CARREGAR SALA...";
-        db.ref('rooms/' + room).on('value', s => {
+        roomID = document.getElementById('room-input').value.trim().toLowerCase();
+        if(!roomID) return;
+        db.ref('rooms/' + roomID).on('value', s => {
             const data = s.val();
-            if(data) { board = data.board; render(); document.getElementById('msg').innerText = "SALA: " + room; }
-            else { initBoard(); db.ref('rooms/' + room).set({board: board}); }
+            if(data) { board = data.board; render(); }
+            else { initBoard(); save(); }
         });
     }
 
     function initBoard() {
+        board.fill(null);
         for(let i=0; i<64; i++) {
             let r = Math.floor(i/8), c = i%8;
             if((r+c)%2==0) {
@@ -84,7 +108,6 @@
         render();
     }
 
-    // DESENHAR IMEDIATAMENTE
     render();
 </script>
 </body>
