@@ -1,132 +1,220 @@
 <!DOCTYPE html>
-<html lang="pt">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MOZDAMAS FINAL FIX</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <title>Damas Pro Master - Online</title>
     <style>
-        body { background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; margin: 0; }
-        #lobby { padding: 20px; display: block; }
-        #game-screen { display: none; background: #e0e0e0; min-height: 100vh; padding: 10px; color: #333; }
-        
-        /* TABULEIRO FORÇADO */
-        #board { 
-            display: grid; 
-            grid-template-columns: repeat(8, 12.5%); 
-            grid-template-rows: repeat(8, 45px); 
-            width: 360px; 
-            height: 360px; 
-            border: 5px solid #333; 
-            margin: 10px auto; 
-            background: #444; /* Fundo de segurança caso as casas falhem */
-        }
-        @media (max-width: 400px) {
-            #board { width: 90vw; height: 90vw; grid-template-rows: repeat(8, 11.25vw); }
+        :root {
+            --bg: #1a1a1a;
+            --panel: #252525;
+            --board-dark: #769656;
+            --board-light: #eeeed2;
+            --white-p: radial-gradient(circle, #ffffff 30%, #cccccc 100%);
+            --black-p: radial-gradient(circle, #444444 30%, #000000 100%);
+            --accent: #2ecc71;
+            --danger: #e74c3c;
         }
 
-        .sq { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
-        .dark { background: #769656 !important; } 
-        .light { background: #eeeed2 !important; }
-        
-        .piece { width: 80%; height: 80%; border-radius: 50%; box-shadow: 0 4px 0 rgba(0,0,0,0.3); }
-        .w { background: white; }
-        .r { background: #e53935; } /* Peças vermelhas estilo PlayOK */
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
-        .btn-play { background: #fbbf24; color: black; padding: 20px; border: none; font-weight: bold; width: 90%; font-size: 18px; cursor: pointer; border-radius: 8px; }
+        #top-bar { background: #111; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; height: 50px; border-bottom: 1px solid #333; }
+        .viewer-count { font-size: 12px; color: #aaa; display: flex; align-items: center; gap: 5px; }
+        .dot { width: 8px; height: 8px; background: var(--danger); border-radius: 50%; display: inline-block; animation: pulse 1.5s infinite; }
+        
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+
+        #game-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px 15px; background: #222; height: 110px; }
+        .hud-top { display: flex; justify-content: space-between; font-size: 10px; color: #888; margin-bottom: 2px; font-weight: bold; }
+        
+        #board-wrapper { flex: 1; display: flex; align-items: center; justify-content: center; padding: 10px; position: relative; }
+        #board { width: min(90vw, 450px); height: min(90vw, 450px); display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); border: 4px solid #333; position: relative; }
+
+        #lobby-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.95); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        #lobby-overlay.hidden { display: none; }
+
+        .square { width: 100%; height: 100%; position: relative; display: flex; justify-content: center; align-items: center; }
+        .dark-sq { background-color: var(--board-dark); }
+        .light-sq { background-color: var(--board-light); }
+        .piece { position: absolute; width: 80%; height: 80%; border-radius: 50%; z-index: 2; box-shadow: 0 4px 4px rgba(0,0,0,0.4); pointer-events: none; }
+        .white { background: var(--white-p); border: 1px solid #999; }
+        .black { background: var(--black-p); border: 1px solid #333; }
+        .king::after { content: '👑'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: min(4vw, 20px); }
+        .selected { transform: scale(1.1); outline: 4px solid #f1c40f; z-index: 10; }
+        .hint { position: absolute; width: 35%; height: 35%; background: rgba(0, 255, 0, 0.4); border-radius: 50%; z-index: 1; }
+
+        .timer { font-family: monospace; font-size: 1.6rem; background: #000; padding: 5px; text-align: center; border-radius: 4px; color: #444; border: 2px solid #333; }
+        .timer.active { color: var(--accent); border-color: var(--accent); }
+        #status-bar { grid-column: span 2; text-align: center; color: #f1c40f; font-weight: bold; font-size: 0.9rem; margin-top: 5px; }
+        .btn-start { padding: 15px 30px; background: var(--accent); color: black; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; font-size: 1.1rem; }
     </style>
 </head>
 <body>
 
-    <div id="lobby">
-        <h2 style="color:#fbbf24">MOZDAMAS ARENA</h2>
-        <button class="btn-play" onclick="entrarNaMesa()">ENTRAR NA MESA ATIVA</button>
-        <p style="color: #666; margin-top: 20px;">Se o ecrã ficar cinzento, recarregue a página.</p>
+    <div id="top-bar">
+        <div style="font-weight: bold; color: var(--accent);">👑 DAMAS PRO ONLINE</div>
+        <div class="viewer-count"><span class="dot"></span> EM TEMPO REAL</div>
     </div>
 
-    <div id="game-screen">
-        <div style="display:flex; justify-content: space-between; align-items: center;">
-            <button onclick="location.reload()">SAIR</button>
-            <b id="status-mesa">MESA #101</b>
+    <div id="game-info">
+        <div>
+            <div class="hud-top"><span>PRETAS</span> <span id="count-black">12</span></div>
+            <div id="timer-black" class="timer">05:00</div>
         </div>
+        <div>
+            <div class="hud-top"><span>BRANCAS</span> <span id="count-white">12</span></div>
+            <div id="timer-white" class="timer active">05:00</div>
+        </div>
+        <div id="status-bar">CONECTANDO AO FIREBASE...</div>
+    </div>
 
+    <div id="board-wrapper">
+        <div id="lobby-overlay">
+            <h2 id="lobby-title">SALA DE JOGO</h2>
+            <button id="start-btn" class="btn-start" onclick="iniciarPartida()">CRIAR/RESETAR JOGO</button>
+        </div>
         <div id="board"></div>
-
-        <div id="ui-jogo">
-            <div style="display:flex; gap:5px; margin-bottom: 10px;">
-                <button style="flex:1" onclick="sentar('p1')">SENTAR #1</button>
-                <button style="flex:1" onclick="sentar('p2')">SENTAR #2</button>
-            </div>
-            <div style="background: white; border: 1px solid #999; height: 100px; padding: 5px; font-size: 12px; text-align: left; overflow-y: auto;">
-                SISTEMA: Bem-vindo ao MozDamas.
-            </div>
-        </div>
     </div>
 
-<script>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    // Credenciais extraídas da sua imagem
     const firebaseConfig = {
-        apiKey: "AIzaSyDNbEcUFGagPPKrEfM5ZmH-RMgNtAp5Rmo",
-        databaseURL: "https://mozdamasonline-default-rtdb.firebaseio.com",
-        projectId: "mozdamasonline",
-        appId: "1:832141619024:web:1d46fcef9e2e37c0274655"
+        apiKey: "AIzaSyCYv_obSjs7x7hLx8p1IANOWMI5G6OmpGo",
+        authDomain: "damas-pro-cf92b.firebaseapp.com",
+        databaseURL: "https://damas-pro-cf92b-default-rtdb.firebaseio.com",
+        projectId: "damas-pro-cf92b",
+        storageBucket: "damas-pro-cf92b.firebasestorage.app",
+        messagingSenderId: "606989896803",
+        appId: "1:606989896803:web:63c2b940baf9f82fcf7c56",
+        measurementId: "G-ZYN36WDVDN"
     };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-    
-    const ID_MESA = "mesa_global_01";
-    let meuID = "Player_" + Math.floor(Math.random() * 999);
 
-    function entrarNaMesa() {
-        document.getElementById('lobby').style.display = 'none';
-        document.getElementById('game-screen').style.display = 'block';
-        
-        // Criar tabuleiro inicial se não existir
-        db.ref('rooms/' + ID_MESA).once('value', snap => {
-            if (!snap.exists()) {
-                let b = Array(64).fill(null);
-                for(let i=0; i<64; i++) {
-                    let r=Math.floor(i/8), c=i%8;
-                    if((r+c)%2==0) {
-                        if(r<3) b[i] = 'r';
-                        if(r>4) b[i] = 'w';
-                    }
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const gameRef = ref(db, 'partida_unica');
+
+    let board = [];
+    let turn = 'white';
+    let selectedSq = null;
+    let legalMoves = [];
+    let gameActive = false;
+
+    function initUI() {
+        const boardEl = document.getElementById('board');
+        boardEl.innerHTML = '';
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const sq = document.createElement('div');
+                sq.className = `square ${(r+c)%2===0?'dark-sq':'light-sq'}`;
+                sq.id = `sq-${r}-${c}`;
+                sq.onclick = () => handleClick(r, c);
+                boardEl.appendChild(sq);
+            }
+        }
+    }
+
+    onValue(gameRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            board = data.board;
+            turn = data.turn;
+            gameActive = data.gameActive;
+            if (gameActive) document.getElementById('lobby-overlay').classList.add('hidden');
+            updateLogic();
+            render();
+        } else {
+            document.getElementById('status-bar').innerText = "SALA VAZIA - CRIE UM JOGO";
+        }
+    });
+
+    window.iniciarPartida = function() {
+        let newBoard = Array(8).fill().map(() => Array(8).fill(null));
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                if((r+c)%2===0) {
+                    if(r<3) newBoard[r][c] = {color:'black',king:false};
+                    if(r>4) newBoard[r][c] = {color:'white',king:false};
                 }
-                db.ref('rooms/' + ID_MESA).set({ board: b, p1: null, p2: null });
             }
-        });
+        }
+        set(gameRef, { board: newBoard, turn: 'white', gameActive: true });
+    };
 
-        // Escutar atualizações
-        db.ref('rooms/' + ID_MESA).on('value', snap => {
-            const dados = snap.val();
-            if (dados && dados.board) {
-                desenhar(dados.board);
+    function handleClick(r, c) {
+        if (!gameActive) return;
+        if (board[r][c]?.color === turn) {
+            selectedSq = { r, c };
+            render();
+        } else if (selectedSq && !board[r][c]) {
+            const move = legalMoves.find(m => m.fr === selectedSq.r && m.fc === selectedSq.c && m.tr === r && m.tc === c);
+            if (move) {
+                const p = board[move.fr][move.fc];
+                board[move.tr][move.tc] = p;
+                board[move.fr][move.fc] = null;
+                if (move.victim) board[move.victim.r][move.victim.c] = null;
+                if (!p.king && ((p.color === 'white' && move.tr === 0) || (p.color === 'black' && move.tr === 7))) p.king = true;
+                turn = turn === 'white' ? 'black' : 'white';
+                selectedSq = null;
+                set(gameRef, { board, turn, gameActive });
             }
-        });
+        }
     }
 
-    function desenhar(tabuleiro) {
-        const bDiv = document.getElementById('board');
-        if (!bDiv) return;
-        bDiv.innerHTML = "";
-        
-        tabuleiro.forEach((p, i) => {
-            const r = Math.floor(i/8), c = i%8;
-            const sq = document.createElement('div');
-            sq.className = `sq ${(r+c)%2==0 ? 'dark' : 'light'}`;
-            
-            if(p) {
-                const pc = document.createElement('div');
-                pc.className = `piece ${p}`;
-                sq.appendChild(pc);
+    function updateLogic() {
+        legalMoves = [];
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                if (board[r] && board[r][c]?.color === turn) {
+                    const dirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
+                    dirs.forEach(d => {
+                        let nr = r + d[0], nc = c + d[1];
+                        if (nr>=0 && nr<8 && nc>=0 && nc<8 && !board[nr][nc]) {
+                            if (board[r][c].king || (turn === 'white' && d[0] < 0) || (turn === 'black' && d[0] > 0)) {
+                                legalMoves.push({ fr: r, fc: c, tr: nr, tc: nc });
+                            }
+                        }
+                        let cr = r + d[0]*2, cc = c + d[1]*2;
+                        if (cr>=0 && cr<8 && cc>=0 && cc<8 && !board[cr][cc] && board[nr][nc] && board[nr][nc].color !== turn) {
+                            legalMoves.push({ fr: r, fc: c, tr: cr, tc: cc, victim: {r:nr, c:nc} });
+                        }
+                    });
+                }
             }
-            
-            sq.onclick = () => console.log("Clicou em " + i);
-            bDiv.appendChild(sq);
-        });
+        }
     }
 
-    function sentar(p) {
-        db.ref('rooms/'+ID_MESA+'/'+p).set(meuID);
-        alert("Agora
-    
+    function render() {
+        let wCount = 0, bCount = 0;
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const sq = document.getElementById(`sq-${r}-${c}`);
+                if (!sq) continue;
+                sq.innerHTML = '';
+                const p = board[r][c];
+                if (p) {
+                    p.color === 'white' ? wCount++ : bCount++;
+                    const div = document.createElement('div');
+                    div.className = `piece ${p.color} ${p.king ? 'king' : ''}`;
+                    if (selectedSq?.r === r && selectedSq?.c === c) div.classList.add('selected');
+                    sq.appendChild(div);
+                }
+                if (selectedSq && legalMoves.some(m => m.fr === selectedSq.r && m.fc === selectedSq.c && m.tr === r && m.tc === c)) {
+                    sq.innerHTML = '<div class="hint"></div>';
+                }
+            }
+        }
+        document.getElementById('count-white').innerText = wCount;
+        document.getElementById('count-black').innerText = bCount;
+        document.getElementById('status-bar').innerText = turn === 'white' ? "VEZ DAS BRANCAS" : "VEZ DAS PRETAS";
+        document.getElementById('timer-white').classList.toggle('active', turn === 'white');
+        document.getElementById('timer-black').classList.toggle('active', turn === 'black');
+    }
+
+    initUI();
+</script>
+</body>
+</html>
