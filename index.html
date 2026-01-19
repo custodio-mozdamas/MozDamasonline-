@@ -3,80 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MOZDAMAS ARENA</title>
+    <title>MOZDAMAS FIX</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
-        :root { --blue-ok: #2b5cb2; --bg-main: #e0e0e0; --side-blue: #9bbce0; }
-        body { background: #1a1a1a; color: #fff; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        body { background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; margin: 0; }
+        #lobby { padding: 50px; }
+        .btn-principal { background: #fbbf24; color: black; padding: 20px; border: none; font-weight: bold; width: 80%; cursor: pointer; }
         
-        /* Cabeçalho */
-        #header { background: var(--blue-ok); padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; }
-        .btn-sair { background: #444; color: white; border: none; padding: 4px 10px; border-radius: 3px; cursor: pointer; }
-
-        #game-container { display: flex; flex: 1; flex-direction: column; overflow: hidden; background: var(--bg-main); }
-        @media (min-width: 800px) { #game-container { flex-direction: row; } }
-
-        /* Área do Tabuleiro */
-        #board-area { flex: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; }
-        #board { display: grid; grid-template-columns: repeat(8, 11vw); grid-template-rows: repeat(8, 11vw); border: 4px solid #333; background: #333; }
-        @media (min-width: 500px) { #board { grid-template-columns: repeat(8, 50px); grid-template-rows: repeat(8, 50px); } }
-        
-        .sq { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
-        .dark { background: #769656; } /* Verde PlayOK */
-        .light { background: #eeeed2; } /* Creme PlayOK */
-        .piece { width: 85%; height: 85%; border-radius: 50%; box-shadow: 0 3px 0 rgba(0,0,0,0.3); }
-        .white { background: #fff; } 
-        .red { background: #e53935; } /* Vermelho PlayOK */
-        .sel { outline: 4px solid #fbbf24; outline-offset: -4px; }
-
-        /* Painel Lateral */
-        #side-panel { flex: 1; background: var(--side-blue); display: flex; flex-direction: column; color: #000; border-top: 2px solid var(--blue-ok); }
-        .btn-seat { width: 100%; padding: 10px; margin: 2px 0; border: 1px solid #777; background: #fff; font-weight: bold; cursor: pointer; }
-        
-        #chat-box { flex: 1; background: #fff; margin: 5px; border: 1px solid #777; display: flex; flex-direction: column; overflow: hidden; }
-        #msgs { flex: 1; overflow-y: auto; font-size: 12px; padding: 5px; color: #333; min-height: 100px; }
-        #chat-in { border: none; border-top: 1px solid #777; padding: 10px; width: 100%; box-sizing: border-box; }
-
-        /* Lobby */
-        #lobby { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 1000; padding: 20px; box-sizing: border-box; overflow-y: auto; }
-        .btn-nova { background: var(--blue-ok); color: #fff; width: 100%; padding: 15px; border: none; border-radius: 5px; font-weight: bold; margin-bottom: 20px; }
+        /* O TABULEIRO - Forçando visibilidade */
+        #game-screen { display: none; padding: 10px; background: #e0e0e0; min-height: 100vh; }
+        #board { 
+            display: grid; 
+            grid-template-columns: repeat(8, 45px); 
+            grid-template-rows: repeat(8, 45px); 
+            gap: 0; 
+            border: 5px solid #333; 
+            margin: 20px auto;
+            width: 360px;
+            height: 360px;
+        }
+        .sq { width: 45px; height: 45px; display: flex; justify-content: center; align-items: center; }
+        .dark { background: #769656 !important; } 
+        .light { background: #eeeed2 !important; }
+        .piece { width: 35px; height: 35px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.2); }
+        .w { background: white; }
+        .r { background: #e53935; }
+        #controles { color: black; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div id="header">
-    <span>DAMAS MOZ</span>
-    <button class="btn-sair" onclick="location.reload()">Sair</button>
-</div>
-
-<div id="lobby">
-    <h2 style="color:#fbbf24; text-align:center;">LOBBY - MOZDAMAS</h2>
-    <button class="btn-nova" onclick="criarMesa()">+ CRIAR NOVA MESA</button>
-    <div id="lista-salas">
-        <p style="text-align:center; color:#666;">A procurar mesas...</p>
+    <div id="lobby">
+        <h1>MOZDAMAS</h1>
+        <button class="btn-principal" onclick="iniciarNovoJogo()">CLIQUE AQUI PARA CRIAR MESA</button>
+        <div id="status"></div>
     </div>
-</div>
 
-<div id="game-container">
-    <div id="board-area">
+    <div id="game-screen">
+        <button onclick="location.reload()" style="float: left;">SAIR</button>
         <div id="board"></div>
-        <div style="display:flex; width:100%; max-width:400px; gap:2px; margin-top:10px;">
-            <button style="flex:1; padding:8px;" onclick="acao('empate')">empate</button>
-            <button style="flex:1; padding:8px;" onclick="acao('desistir')">desistir</button>
-            <button style="flex:1; padding:8px;" onclick="location.reload()">voltar</button>
+        <div id="controles">
+            <p>MESA ATIVA</p>
+            <button onclick="sentar('p1')">SENTAR LUGAR #1</button>
+            <button onclick="sentar('p2')">SENTAR LUGAR #2</button>
         </div>
     </div>
-
-    <div id="side-panel">
-        <button id="p1-btn" class="btn-seat" onclick="sentar('p1')">#1 Selecione o lugar</button>
-        <button id="p2-btn" class="btn-seat" onclick="sentar('p2')">#2 Selecione o lugar</button>
-        <div id="chat-box">
-            <div id="msgs"></div>
-            <input type="text" id="chat-in" placeholder="Escrever..." onkeypress="enviarChat(event)">
-        </div>
-    </div>
-</div>
 
 <script>
     const firebaseConfig = {
@@ -87,101 +59,51 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+    let salaID = "mesa_teste_1";
+    let meuID = "User_" + Math.floor(Math.random()*999);
 
-    let meuID = "User_" + Math.floor(Math.random() * 999);
-    let salaID = null;
-    let dados = null;
-    let sel = null;
-
-    // 1. Carregar Lista de Mesas no Lobby
-    db.ref('rooms').on('value', snap => {
-        const lista = document.getElementById('lista-salas');
-        lista.innerHTML = "";
-        if(!snap.exists()) return lista.innerHTML = "<p style='text-align:center; color:#666;'>Nenhuma mesa ativa.</p>";
-        
-        snap.forEach(mesa => {
-            const div = document.createElement('div');
-            div.style = "padding:15px; border-bottom:1px solid #333; cursor:pointer; background:#222; margin-bottom:5px;";
-            div.innerText = "Mesa #" + mesa.key.slice(-4);
-            div.onclick = () => entrar(mesa.key);
-            lista.appendChild(div);
-        });
-    });
-
-    function criarMesa() {
-        const id = "m_" + Date.now();
-        const b = Array(64).fill(null);
+    function iniciarNovoJogo() {
+        // Criar tabuleiro inicial
+        let b = Array(64).fill(null);
         for(let i=0; i<64; i++) {
             let r=Math.floor(i/8), c=i%8;
             if((r+c)%2==0) {
-                if(r<3) b[i] = 'r'; // Vermelhas
-                if(r>4) b[i] = 'w'; // Brancas
+                if(r<3) b[i] = 'r';
+                if(r>4) b[i] = 'w';
             }
         }
-        db.ref('rooms/' + id).set({ board: b, p1: null, p2: null }).then(() => entrar(id));
-    }
-
-    function entrar(id) {
-        salaID = id;
-        document.getElementById('lobby').style.display = 'none';
-        db.ref('rooms/' + id).on('value', snap => {
-            dados = snap.val();
-            desenhar();
-        });
-        // Escutar Chat
-        db.ref('chats/' + id).off(); // Limpa escutas antigas
-        db.ref('chats/' + id).on('child_added', snap => {
-            const m = snap.val();
-            document.getElementById('msgs').innerHTML += `<div><b>${m.u}:</b> ${m.t}</div>`;
-            document.getElementById('msgs').scrollTop = 9999;
+        // Gravar no Firebase e entrar
+        db.ref('rooms/' + salaID).set({ board: b, p1: null, p2: null }).then(() => {
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'block';
+            escutarJogo();
         });
     }
 
-    function desenhar() {
-        if(!dados) return;
-        const bDiv = document.getElementById('board');
-        bDiv.innerHTML = "";
-        dados.board.forEach((p, i) => {
-            const r = Math.floor(i/8), c = i%8;
-            const sq = document.createElement('div');
-            sq.className = `sq ${(r+c)%2==0?'dark':'light'} ${sel===i?'sel':''}`;
-            if(p) {
-                const pc = document.createElement('div');
-                pc.className = `piece ${p==='w'?'white':'red'}`;
-                sq.appendChild(pc);
-            }
-            sq.onclick = () => clicar(i);
-            bDiv.appendChild(sq);
+    function escutarJogo() {
+        db.ref('rooms/' + salaID).on('value', snap => {
+            const dados = snap.val();
+            const bDiv = document.getElementById('board');
+            bDiv.innerHTML = "";
+            
+            dados.board.forEach((p, i) => {
+                const r = Math.floor(i/8), c = i%8;
+                const sq = document.createElement('div');
+                sq.className = `sq ${(r+c)%2==0 ? 'dark' : 'light'}`;
+                if(p) {
+                    const pc = document.createElement('div');
+                    pc.className = `piece ${p}`;
+                    sq.appendChild(pc);
+                }
+                bDiv.appendChild(sq);
+            });
         });
-        document.getElementById('p1-btn').innerText = dados.p1 ? (dados.p1===meuID ? "VOCÊ (#1)" : "OCUPADO") : "#1 Selecione o lugar";
-        document.getElementById('p2-btn').innerText = dados.p2 ? (dados.p2===meuID ? "VOCÊ (#2)" : "OCUPADO") : "#2 Selecione o lugar";
     }
 
-    function sentar(p) { if(!dados[p]) db.ref('rooms/'+salaID+'/'+p).set(meuID); }
-
-    function clicar(i) {
-        if(dados.p1 !== meuID && dados.p2 !== meuID) return;
-        if(dados.board[i]) {
-            sel = i;
-        } else if(sel !== null) {
-            const b = [...dados.board];
-            b[i] = b[sel]; b[sel] = null;
-            db.ref('rooms/'+salaID+'/board').set(b);
-            sel = null;
-        }
-        desenhar();
+    function sentar(p) {
+        db.ref('rooms/'+salaID+'/'+p).set(meuID);
+        alert("Sentou no lugar " + p);
     }
-
-    function enviarChat(e) {
-        if(e.key === 'Enter') {
-            const inp = document.getElementById('chat-in');
-            if(!inp.value.trim()) return;
-            db.ref('chats/'+salaID).push({ u: meuID, t: inp.value });
-            inp.value = "";
-        }
-    }
-
-    function acao(t) { if(confirm("Deseja "+t+"?")) db.ref('chats/'+salaID).push({ u:"SISTEMA", t: meuID+" pediu "+t }); }
 </script>
 </body>
 </html>
