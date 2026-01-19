@@ -1,120 +1,203 @@
 <!DOCTYPE html>
-<html lang="pt">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>MOZDAMAS REGRAS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MOZDAMAS ARENA</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
-        body { background: #0f172a; color: white; font-family: sans-serif; text-align: center; margin: 0; padding: 10px; }
-        #board { display: grid; grid-template-columns: repeat(8, 11vw); grid-template-rows: repeat(8, 11vw); border: 4px solid #334155; margin: 15px auto; width: fit-content; }
+        :root { --blue-ok: #2b5cb2; --bg-table: #e0e0e0; --side-bg: #9bbce0; }
+        body { background: #1a1a1a; color: #fff; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        /* Topo */
+        #header { background: var(--blue-ok); padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+        .btn-exit { background: #444; color: white; border: none; padding: 4px 12px; border-radius: 3px; cursor: pointer; }
+
+        #main { display: flex; flex: 1; flex-direction: column; overflow: hidden; }
+        @media (min-width: 800px) { #main { flex-direction: row; } }
+
+        /* Tabuleiro */
+        #game-area { flex: 2; background: var(--bg-table); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; }
+        #board { display: grid; grid-template-columns: repeat(8, 11vw); grid-template-rows: repeat(8, 11vw); border: 4px solid #333; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
         @media (min-width: 500px) { #board { grid-template-columns: repeat(8, 50px); grid-template-rows: repeat(8, 50px); } }
+        
         .sq { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
-        .dark { background: #769656; } .light { background: #eeeed2; }
-        .piece { width: 80%; height: 80%; border-radius: 50%; border: 2px solid rgba(0,0,0,0.2); }
-        .white { background: #fff; box-shadow: 0 3px 0 #ccc; }
-        .black { background: #1a1a1a; box-shadow: 0 3px 0 #000; }
-        .sel { background: rgba(251, 191, 36, 0.5) !important; }
-        input { padding: 12px; border-radius: 5px; width: 60%; border: none; }
-        button { background: #fbbf24; padding: 12px; border: none; font-weight: bold; border-radius: 5px; }
+        .dark { background: #769656; } /* Verde PlayOK */
+        .light { background: #eeeed2; } /* Creme PlayOK */
+        .piece { width: 85%; height: 85%; border-radius: 50%; position: relative; }
+        .white { background: #fff; box-shadow: 0 3px 0 #bbb; border: 1px solid #ccc; } 
+        .black { background: #e53935; box-shadow: 0 3px 0 #b71c1c; border: 1px solid #c62828; } /* Vermelho PlayOK */
+        .sel { outline: 4px solid #fbbf24; outline-offset: -4px; }
+
+        /* Painel Lateral */
+        #side-panel { flex: 1; background: var(--side-bg); display: flex; flex-direction: column; color: #000; border-left: 1px solid #2b5cb2; }
+        .seat-area { padding: 5px; }
+        .btn-seat { width: 100%; padding: 10px; margin-bottom: 5px; border: 1px solid #777; background: #fff; font-weight: bold; cursor: pointer; }
+        .occupied { background: #eee; color: #555; cursor: default; }
+        
+        .action-bar { display: flex; gap: 2px; padding: 0 5px; }
+        .btn-action { flex: 1; padding: 6px; font-size: 11px; background: #ccc; border: 1px solid #777; cursor: pointer; }
+
+        /* Chat */
+        #chat-box { flex: 1; background: #fff; margin: 5px; border: 1px solid #777; display: flex; flex-direction: column; }
+        #chat-msgs { flex: 1; overflow-y: auto; font-size: 12px; padding: 5px; line-height: 1.4; }
+        #chat-in { border: none; border-top: 1px solid #777; padding: 10px; outline: none; }
+
+        #lobby { position: absolute; top:0; left:0; width:100%; height:100%; background:#1a1a1a; z-index:100; padding:20px; box-sizing:border-box; }
     </style>
 </head>
 <body>
-    <div id="lobby">
-        <input type="text" id="room" placeholder="Sala">
-        <button onclick="entrar()">ENTRAR</button>
+
+<div id="header">
+    <span>DAMAS MOZ</span>
+    <button class="btn-exit" onclick="location.reload()">Sair</button>
+</div>
+
+<div id="lobby">
+    <button class="btn-seat" style="background:var(--blue-ok); color:#fff; padding:15px;" onclick="createTable()">+ NOVA MESA DE JOGO</button>
+    <div id="room-list" style="margin-top:20px;"></div>
+</div>
+
+<div id="main">
+    <div id="game-area">
+        <div id="board"></div>
+        <div class="action-bar" style="width:100%; max-width:400px; margin-top:10px;">
+            <button class="btn-action" onclick="action('empate')">empate</button>
+            <button class="btn-action" onclick="action('desistir')">desistir</button>
+            <button class="btn-action" onclick="location.reload()">voltar</button>
+        </div>
     </div>
-    <div id="board"></div>
-    <h3 id="msg">Seleciona uma peça</h3>
+
+    <div id="side-panel">
+        <div class="seat-area">
+            <button id="s1" class="btn-seat" onclick="sit('p1')">#1 Selecione o lugar</button>
+            <button id="s2" class="btn-seat" onclick="sit('p2')">#2 Selecione o lugar</button>
+        </div>
+        
+        <div style="display:flex; font-size:12px; border-bottom:1px solid #777;">
+            <div style="flex:1; background:#fff; padding:5px; text-align:center;">chat</div>
+            <div style="flex:1; padding:5px; text-align:center;">usuários</div>
+        </div>
+
+        <div id="chat-box">
+            <div id="chat-msgs"></div>
+            <input type="text" id="chat-in" placeholder="Escrever..." onkeypress="send(event)">
+        </div>
+    </div>
+</div>
 
 <script>
-    const cfg = {
+    const firebaseConfig = {
         apiKey: "AIzaSyDNbEcUFGagPPKrEfM5ZmH-RMgNtAp5Rmo",
         databaseURL: "https://mozdamasonline-default-rtdb.firebaseio.com",
         projectId: "mozdamasonline",
         appId: "1:832141619024:web:1d46fcef9e2e37c0274655"
     };
-    if (!firebase.apps.length) firebase.initializeApp(cfg);
+    firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    
-    let b = Array(64).fill(null);
-    let s = null; 
-    let rId = '';
 
-    function render() {
-        const div = document.getElementById('board');
-        div.innerHTML = '';
-        b.forEach((p, i) => {
-            const row = Math.floor(i/8), col = i%8;
-            const sq = document.createElement('div');
-            sq.className = `sq ${(row+col)%2==0?'dark':'light'} ${s===i?'sel':''}`;
-            if(p) {
-                const pc = document.createElement('div');
-                pc.className = `piece ${p === 'w' ? 'white' : 'black'}`;
-                sq.appendChild(pc);
+    let myID = "Player_" + Math.floor(Math.random() * 999);
+    let curRoom = null, curData = null, selIdx = null;
+
+    // Inicializar Lobby
+    db.ref('rooms').on('value', snap => {
+        const list = document.getElementById('room-list');
+        list.innerHTML = "";
+        snap.forEach(room => {
+            const div = document.createElement('div');
+            div.style = "padding:15px; border-bottom:1px solid #333; cursor:pointer;";
+            div.innerText = "Mesa #" + room.key.slice(-3);
+            div.onclick = () => join(room.key);
+            list.appendChild(div);
+        });
+    });
+
+    function createTable() {
+        const id = "mesa_" + Date.now();
+        const b = Array(64).fill(null);
+        for(let i=0; i<64; i++){
+            let r=Math.floor(i/8), c=i%8;
+            if((r+c)%2==0){
+                if(r<3) b[i] = 'b';
+                if(r>4) b[i] = 'w';
             }
-            sq.onclick = () => clique(i);
-            div.appendChild(sq);
+        }
+        db.ref('rooms/' + id).set({ board: b, p1: null, p2: null }).then(() => join(id));
+    }
+
+    function join(id) {
+        curRoom = id;
+        document.getElementById('lobby').style.display = 'none';
+        db.ref('rooms/' + id).on('value', snap => {
+            curData = snap.val();
+            render();
+        });
+        db.ref('chats/'+id).on('child_added', snap => {
+            const m = snap.val();
+            document.getElementById('chat-msgs').innerHTML += `<div><b>${m.u}:</b> ${m.t}</div>`;
+            document.getElementById('chat-msgs').scrollTop = 9999;
         });
     }
 
-    function clique(i) {
-        const row = Math.floor(i/8), col = i%8;
-        if (b[i]) {
-            s = i; // Seleciona
-        } else if (s !== null) {
-            const sRow = Math.floor(s/8), sCol = s%8;
-            const rowDiff = row - sRow;
-            const colDiff = Math.abs(col - sCol);
-
-            // REGRA: Movimento Simples (1 casa diagonal)
-            if (Math.abs(rowDiff) === 1 && colDiff === 1) {
-                mover(s, i);
-            } 
-            // REGRA: Captura (2 casas diagonal)
-            else if (Math.abs(rowDiff) === 2 && colDiff === 2) {
-                const mRow = (sRow + row) / 2;
-                const mCol = (sCol + col) / 2;
-                const mIdx = mRow * 8 + mCol;
-                if (b[mIdx] && b[mIdx] !== b[s]) {
-                    b[mIdx] = null; // Remove a peça capturada
-                    mover(s, i);
-                }
+    function render() {
+        const bDiv = document.getElementById('board');
+        bDiv.innerHTML = "";
+        curData.board.forEach((p, i) => {
+            const sq = document.createElement('div');
+            sq.className = `sq ${(Math.floor(i/8)+(i%8))%2==0?'dark':'light'} ${selIdx===i?'sel':''}`;
+            if(p){
+                const pc = document.createElement('div');
+                pc.className = `piece ${p==='w'?'white':'black'}`;
+                sq.appendChild(pc);
             }
+            sq.onclick = () => clickSq(i);
+            bDiv.appendChild(sq);
+        });
+        // Atualizar Botões de Lugar
+        btnSeat('s1', curData.p1, 'p1');
+        btnSeat('s2', curData.p2, 'p2');
+    }
+
+    function btnSeat(id, p, slot) {
+        const el = document.getElementById(id);
+        if(p) {
+            el.innerText = p === myID ? "VOCÊ ESTÁ AQUI" : "OCUPADO";
+            el.className = "btn-seat occupied";
+        } else {
+            el.innerText = "#" + (slot==='p1'?'1':'2') + " Selecione o lugar";
+            el.className = "btn-seat";
+        }
+    }
+
+    function sit(p) { if(!curData[p]) db.ref('rooms/'+curRoom+'/'+p).set(myID); }
+
+    function clickSq(i) {
+        if(curData.p1 !== myID && curData.p2 !== myID) return; // Espectador
+        if(curData.board[i]) {
+            selIdx = i;
+        } else if(selIdx !== null) {
+            const b = [...curData.board];
+            b[i] = b[selIdx]; b[selIdx] = null;
+            db.ref('rooms/'+curRoom+'/board').set(b);
+            selIdx = null;
         }
         render();
     }
 
-    function mover(de, para) {
-        b[para] = b[de];
-        b[de] = null;
-        s = null;
-        if(rId) db.ref('rooms/' + rId).set(b);
-    }
-
-    function entrar() {
-        rId = document.getElementById('room').value.toLowerCase().trim();
-        if(!rId) return;
-        db.ref('rooms/' + rId).on('value', snap => {
-            if (snap.exists()) b = snap.val();
-            else { resetBoard(); db.ref('rooms/' + rId).set(b); }
-            render();
-        });
-    }
-
-    function resetBoard() {
-        b.fill(null);
-        for(let i=0; i<64; i++) {
-            let r = Math.floor(i/8), c = i%8;
-            if((r+c)%2==0) {
-                if(r < 3) b[i] = 'b';
-                if(r > 4) b[i] = 'w';
-            }
+    function send(e) {
+        if(e.key === 'Enter') {
+            const i = document.getElementById('chat-in');
+            db.ref('chats/'+curRoom).push({ u: myID, t: i.value });
+            i.value = "";
         }
     }
-    resetBoard();
-    render();
+
+    function action(t) {
+        if(confirm("Deseja " + t + "?")) {
+            db.ref('chats/'+curRoom).push({ u: "SISTEMA", t: myID + " solicitou " + t });
+        }
+    }
 </script>
 </body>
 </html>
