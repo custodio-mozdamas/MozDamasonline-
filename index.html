@@ -14,6 +14,7 @@
             --black-p: radial-gradient(circle, #444444 30%, #000000 100%);
             --accent: #2ecc71;
             --danger: #e74c3c;
+            --warning: #f1c40f;
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -31,8 +32,14 @@
         #board-wrapper { flex: 1; display: flex; align-items: center; justify-content: center; padding: 10px; position: relative; }
         #board { width: min(90vw, 450px); height: min(90vw, 450px); display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); border: 4px solid #333; position: relative; transition: transform 0.5s ease; }
 
-        #lobby-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.95); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-        #lobby-overlay.hidden { display: none; }
+        #lobby-overlay, #game-over-overlay, #draw-overlay { 
+            position: absolute; inset: 0; background: rgba(0,0,0,0.95); z-index: 100; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;
+        }
+        .hidden { display: none !important; }
+
+        .modal-title { font-size: 2rem; color: var(--accent); margin-bottom: 10px; }
+        .modal-msg { color: #ccc; margin-bottom: 25px; font-size: 1.1rem; max-width: 80%; }
 
         .square { width: 100%; height: 100%; position: relative; display: flex; justify-content: center; align-items: center; }
         .dark-sq { background-color: var(--board-dark); }
@@ -57,6 +64,7 @@
         #status-bar { grid-column: span 2; text-align: center; color: #f1c40f; font-weight: bold; font-size: 0.9rem; margin-top: 5px; }
         .menu-btn { width: 100%; padding: 10px; background: #333; border: 1px solid #444; color: white; cursor: pointer; text-align: left; border-radius: 4px; font-weight: bold; }
         .btn-start { background: var(--accent); color: black; text-align: center; margin-top: 15px; }
+        .btn-draw { background: var(--warning); color: black; text-align: center; }
         
         select { background: #111; color: white; padding: 8px; border: 1px solid #444; width: 100%; border-radius: 4px; transition: 0.3s; }
         select:disabled { opacity: 0.5; cursor: not-allowed; background: #222; }
@@ -90,16 +98,40 @@
 
     <div id="board-wrapper">
         <div id="lobby-overlay">
-            <h2 id="lobby-title">SALA DE ESPERA</h2>
+            <h2 class="modal-title">SALA DE ESPERA</h2>
             <p id="lobby-msg" style="color:#888; font-size:13px;">Escolha suas preferências no menu ⋮</p>
             <button id="start-btn" class="menu-btn btn-start" onclick="iniciarLobby()" style="width:200px">INICIAR PARTIDA</button>
         </div>
+
+        <div id="game-over-overlay" class="hidden">
+            <h2 id="game-over-title" class="modal-title">FIM DE JOGO</h2>
+            <p id="game-over-msg" class="modal-msg"></p>
+            <button class="menu-btn btn-start" onclick="location.reload()" style="width:200px">JOGAR NOVAMENTE</button>
+        </div>
+
+        <div id="draw-overlay" class="hidden">
+            <h2 class="modal-title" style="color: var(--warning)">OFERTA DE EMPATE</h2>
+            <p id="draw-msg" class="modal-msg">O oponente propôs um empate. Você aceita?</p>
+            <div style="display: flex; gap: 10px;">
+                <button class="menu-btn btn-start" onclick="responderEmpate(true)" style="width:120px">ACEITAR</button>
+                <button class="menu-btn" onclick="responderEmpate(false)" style="width:120px; background: var(--danger); border: none;">RECUSAR</button>
+            </div>
+        </div>
+
         <div id="board"></div>
     </div>
 
     <div id="side-menu">
         <h3 style="margin: 0; border-bottom: 1px solid #444; padding-bottom: 10px;">Opções</h3>
         
+        <label>Tempo de Partida <span class="lock-text" id="lock-time">🔒 BLOQUEADO</span></label>
+        <select id="time-select" onchange="applyTimeSettings()">
+            <option value="60">1 Minuto</option>
+            <option value="180">3 Minutos</option>
+            <option value="300" selected>5 Minutos</option>
+            <option value="600">10 Minutos</option>
+        </select>
+
         <label>Lado (Baixo) <span class="lock-text" id="lock-side">🔒 BLOQUEADO</span></label>
         <select id="side-select" onchange="applySide()">
             <option value="white">Brancas</option>
@@ -118,6 +150,7 @@
             <ul id="user-list" style="list-style:none; padding:0; margin:0;"></ul>
         </div>
 
+        <button class="menu-btn btn-draw" onclick="oferecerEmpate()" style="margin-top:10px">Oferecer Empate</button>
         <button class="menu-btn" onclick="desistir()" style="margin-top:10px">Abandonar Partida</button>
         <button class="menu-btn" style="background:#c0392b; border:none; margin-top: auto; text-align:center;" onclick="location.reload()">REINICIAR</button>
     </div>
@@ -137,9 +170,18 @@
         { name: "Draken", rank: "Ouro II", id: 1 }
     ];
 
+    function applyTimeSettings() {
+        if (gameStarted) return;
+        const seconds = parseInt(document.getElementById('time-select').value);
+        timers.white = seconds;
+        timers.black = seconds;
+        updateTimerUI();
+    }
+
     function updateSocialList() {
         const list = document.getElementById('user-list');
-        document.getElementById('host-name').innerText = `👑 ${users[0].name.toUpperCase()}`;
+        const hostEl = document.getElementById('host-name');
+        if(hostEl) hostEl.innerText = `👑 ${users[0].name.toUpperCase()}`;
         list.innerHTML = users.map((u, index) => `
             <li class="user-item">
                 <div><span class="rank-badge">${u.rank}</span> <span style="${u.id === 'me' ? 'color:var(--accent)' : ''}">${u.name}</span></div>
@@ -167,25 +209,54 @@
         document.documentElement.style.setProperty('--board-light', t.l);
     }
 
-    function iniciarLobby() {
-        if(users[0].id !== 'me') return alert("Apenas o anfitrião inicia.");
-        
-        // BLOQUEIO DOS SELETORES
-        document.getElementById('side-select').disabled = true;
-        document.getElementById('theme-select').disabled = true;
-        document.getElementById('lock-side').style.display = 'inline';
-        document.getElementById('lock-theme').style.display = 'inline';
+    function oferecerEmpate() {
+        if (!gameActive) return;
+        toggleMenu(); // Fecha o menu lateral
+        document.getElementById('draw-overlay').classList.remove('hidden');
+        document.getElementById('draw-msg').innerText = `O jogador das ${turn === 'white' ? 'BRANCAS' : 'PRETAS'} propôs um empate.`;
+    }
 
+    function responderEmpate(aceitou) {
+        document.getElementById('draw-overlay').classList.add('hidden');
+        if (aceitou) {
+            gameActive = false;
+            const title = document.getElementById('game-over-title');
+            const msg = document.getElementById('game-over-msg');
+            title.innerText = "EMPATE!";
+            title.style.color = "var(--warning)";
+            msg.innerText = "A partida terminou em comum acordo entre os jogadores.";
+            document.getElementById('game-over-overlay').classList.remove('hidden');
+        }
+    }
+
+    function finalizarJogo(vencedor, motivo) {
+        gameActive = false;
+        const overlay = document.getElementById('game-over-overlay');
+        const title = document.getElementById('game-over-title');
+        const msg = document.getElementById('game-over-msg');
+        title.innerText = vencedor === "EMPATE" ? "EMPATE!" : `VITÓRIA DAS ${vencedor}!`;
+        title.style.color = vencedor === "EMPATE" ? "var(--warning)" : "var(--accent)";
+        msg.innerText = motivo;
+        overlay.classList.remove('hidden');
+        document.getElementById('status-bar').innerText = "JOGO FINALIZADO";
+        document.getElementById('status-bar').style.color = "var(--danger)";
+    }
+
+    function iniciarLobby() {
+        if(users[0].id !== 'me') return;
+        ['side-select', 'theme-select', 'time-select'].forEach(id => document.getElementById(id).disabled = true);
+        ['lock-side', 'lock-theme', 'lock-time'].forEach(id => document.getElementById(id).style.display = 'inline');
+        
         document.getElementById('start-btn').innerText = "INICIANDO...";
         setTimeout(() => {
             document.getElementById('lobby-overlay').classList.add('hidden');
             gameActive = true;
             gameStarted = true;
+            updateLogic();
             render();
         }, 800);
     }
 
-    // --- Lógica do Tabuleiro (Preservada) ---
     function init() {
         const boardEl = document.getElementById('board');
         boardEl.innerHTML = '';
@@ -201,7 +272,6 @@
                 boardEl.appendChild(sq);
             }
         }
-        updateLogic();
         updateSocialList();
         setInterval(tick, 1000);
     }
@@ -217,7 +287,8 @@
         } else {
             if (!p.king && ((p.color === 'white' && move.tr === 0) || (p.color === 'black' && move.tr === 7))) p.king = true;
             inMultiCapture = false; turn = turn === 'white' ? 'black' : 'white';
-            selectedSq = null; updateLogic();
+            selectedSq = null; 
+            updateLogic();
         }
         render();
     }
@@ -271,11 +342,22 @@
 
     function updateLogic() {
         let caps = [];
-        for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) if (board[r][c]?.color === turn) caps.push(...getBestCaptures(r, c, board));
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                if (board[r][c]?.color === turn) caps.push(...getBestCaptures(r, c, board));
+            }
+        }
         if (caps.length > 0) {
             const max = Math.max(...caps.map(m => m.totalCount));
             legalMoves = caps.filter(m => m.totalCount === max);
-        } else legalMoves = getSimpleMoves();
+        } else {
+            legalMoves = getSimpleMoves();
+        }
+        if (gameStarted && gameActive && legalMoves.length === 0) {
+            const vencedor = turn === 'white' ? "PRETAS" : "BRANCAS";
+            const motivo = turn === 'white' ? "As Brancas não têm mais jogadas." : "As Pretas não têm mais jogadas.";
+            finalizarJogo(vencedor, motivo);
+        }
     }
 
     function handleClick(r, c) {
@@ -308,8 +390,8 @@
             }
         }
         document.getElementById('count-white').innerText = wCount;
-        document.getElementById('count-black').innerText = bCount;
-        if(gameStarted) {
+                  document.getElementById('count-black').innerText = bCount;
+        if(gameStarted && gameActive) {
             document.getElementById('status-bar').innerText = turn === 'white' ? "VEZ DAS BRANCAS" : "VEZ DAS PRETAS";
             document.getElementById('timer-white').classList.toggle('active', turn === 'white');
             document.getElementById('timer-black').classList.toggle('active', turn === 'black');
@@ -319,12 +401,17 @@
     function tick() {
         if (!gameActive || !gameStarted) return;
         timers[turn]--; updateTimerUI();
-        if (timers[turn] <= 0) { gameActive = false; alert("TEMPO ESGOTADO!"); }
+        if (timers[turn] <= 0) { 
+            const vencedor = turn === 'white' ? "PRETAS" : "BRANCAS";
+            finalizarJogo(vencedor, "O tempo do oponente acabou."); 
+        }
     }
 
     function updateTimerUI() {
         ['white', 'black'].forEach(c => {
-            const t = timers[c]; document.getElementById(`timer-${c}`).innerText = `${Math.floor(t/60).toString().padStart(2,'0')}:${(t%60).toString().padStart(2,'0')}`;
+            const t = timers[c]; 
+            const el = document.getElementById(`timer-${c}`);
+            if(el) el.innerText = `${Math.floor(t/60).toString().padStart(2,'0')}:${(t%60).toString().padStart(2,'0')}`;
         });
     }
 
@@ -333,8 +420,12 @@
         document.getElementById('overlay').style.display = document.getElementById('side-menu').classList.contains('open') ? 'block' : 'none';
     }
 
-    function desistir() { if (confirm("Deseja desistir?")) { gameActive = false; alert("Fim de jogo."); } }
-
+    function desistir() { 
+        if (confirm("Deseja desistir?")) { 
+            const vencedor = turn === 'white' ? "PRETAS" : "BRANCAS";
+            finalizarJogo(vencedor, "O oponente abandonou a partida."); 
+        } 
+    }
     init();
 </script>
 </body>
