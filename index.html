@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -7,82 +7,78 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
-        :root { --blue-ok: #2b5cb2; --bg-table: #e0e0e0; --side-bg: #9bbce0; }
-        body { background: #1a1a1a; color: #fff; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        :root { --blue-ok: #2b5cb2; --bg-main: #e0e0e0; --side-blue: #9bbce0; }
+        body { background: #1a1a1a; color: #fff; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
         
-        /* Topo */
-        #header { background: var(--blue-ok); padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
-        .btn-exit { background: #444; color: white; border: none; padding: 4px 12px; border-radius: 3px; cursor: pointer; }
+        /* Cabeçalho */
+        #header { background: var(--blue-ok); padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; }
+        .btn-sair { background: #444; color: white; border: none; padding: 4px 10px; border-radius: 3px; cursor: pointer; }
 
-        #main { display: flex; flex: 1; flex-direction: column; overflow: hidden; }
-        @media (min-width: 800px) { #main { flex-direction: row; } }
+        #game-container { display: flex; flex: 1; flex-direction: column; overflow: hidden; }
+        @media (min-width: 800px) { #game-container { flex-direction: row; } }
 
-        /* Tabuleiro */
-        #game-area { flex: 2; background: var(--bg-table); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; }
-        #board { display: grid; grid-template-columns: repeat(8, 11vw); grid-template-rows: repeat(8, 11vw); border: 4px solid #333; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        /* Área do Tabuleiro */
+        #board-area { flex: 2; background: var(--bg-main); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; }
+        #board { display: grid; grid-template-columns: repeat(8, 11vw); grid-template-rows: repeat(8, 11vw); border: 4px solid #333; background: #333; }
         @media (min-width: 500px) { #board { grid-template-columns: repeat(8, 50px); grid-template-rows: repeat(8, 50px); } }
         
         .sq { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
         .dark { background: #769656; } /* Verde PlayOK */
         .light { background: #eeeed2; } /* Creme PlayOK */
-        .piece { width: 85%; height: 85%; border-radius: 50%; position: relative; }
-        .white { background: #fff; box-shadow: 0 3px 0 #bbb; border: 1px solid #ccc; } 
-        .black { background: #e53935; box-shadow: 0 3px 0 #b71c1c; border: 1px solid #c62828; } /* Vermelho PlayOK */
+        .piece { width: 85%; height: 85%; border-radius: 50%; box-shadow: 0 3px 0 rgba(0,0,0,0.3); }
+        .white { background: #fff; } 
+        .red { background: #e53935; } /* Vermelho PlayOK */
         .sel { outline: 4px solid #fbbf24; outline-offset: -4px; }
 
+        /* Botões de Ação */
+        .action-bar { display: flex; width: 100%; max-width: 400px; gap: 2px; margin-top: 10px; }
+        .btn-act { flex: 1; padding: 8px; font-size: 12px; background: #ccc; border: 1px solid #777; cursor: pointer; color: #000; }
+
         /* Painel Lateral */
-        #side-panel { flex: 1; background: var(--side-bg); display: flex; flex-direction: column; color: #000; border-left: 1px solid #2b5cb2; }
-        .seat-area { padding: 5px; }
-        .btn-seat { width: 100%; padding: 10px; margin-bottom: 5px; border: 1px solid #777; background: #fff; font-weight: bold; cursor: pointer; }
-        .occupied { background: #eee; color: #555; cursor: default; }
+        #side-panel { flex: 1; background: var(--side-blue); display: flex; flex-direction: column; color: #000; border-left: 1px solid var(--blue-ok); }
+        .seat-box { padding: 5px; }
+        .btn-seat { width: 100%; padding: 12px; margin-bottom: 5px; border: 1px solid #777; background: #fff; font-weight: bold; cursor: pointer; }
         
-        .action-bar { display: flex; gap: 2px; padding: 0 5px; }
-        .btn-action { flex: 1; padding: 6px; font-size: 11px; background: #ccc; border: 1px solid #777; cursor: pointer; }
-
-        /* Chat */
         #chat-box { flex: 1; background: #fff; margin: 5px; border: 1px solid #777; display: flex; flex-direction: column; }
-        #chat-msgs { flex: 1; overflow-y: auto; font-size: 12px; padding: 5px; line-height: 1.4; }
-        #chat-in { border: none; border-top: 1px solid #777; padding: 10px; outline: none; }
+        #msgs { flex: 1; overflow-y: auto; font-size: 12px; padding: 5px; color: #333; }
+        #chat-in { border: none; border-top: 1px solid #777; padding: 10px; width: 100%; box-sizing: border-box; }
 
-        #lobby { position: absolute; top:0; left:0; width:100%; height:100%; background:#1a1a1a; z-index:100; padding:20px; box-sizing:border-box; }
+        #lobby { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 1000; padding: 20px; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
 <div id="header">
     <span>DAMAS MOZ</span>
-    <button class="btn-exit" onclick="location.reload()">Sair</button>
+    <button class="btn-sair" onclick="location.reload()">Sair</button>
 </div>
 
 <div id="lobby">
-    <button class="btn-seat" style="background:var(--blue-ok); color:#fff; padding:15px;" onclick="createTable()">+ NOVA MESA DE JOGO</button>
-    <div id="room-list" style="margin-top:20px;"></div>
+    <h2 style="color:#fbbf24; text-align:center;">MOZDAMAS ARENA</h2>
+    <button class="btn-seat" style="background:var(--blue-ok); color:#fff; height:60px;" onclick="criarMesa()">+ CRIAR NOVA MESA</button>
+    <div id="lista-salas" style="margin-top:20px;">
+        <p style="text-align:center; color:#666;">A carregar mesas disponíveis...</p>
+    </div>
 </div>
 
-<div id="main">
-    <div id="game-area">
+<div id="game-container">
+    <div id="board-area">
         <div id="board"></div>
-        <div class="action-bar" style="width:100%; max-width:400px; margin-top:10px;">
-            <button class="btn-action" onclick="action('empate')">empate</button>
-            <button class="btn-action" onclick="action('desistir')">desistir</button>
-            <button class="btn-action" onclick="location.reload()">voltar</button>
+        <div class="action-bar">
+            <button class="btn-act" onclick="avisar('empate')">empate</button>
+            <button class="btn-act" onclick="avisar('desistir')">desistir</button>
+            <button class="btn-act" onclick="location.reload()">voltar</button>
         </div>
     </div>
 
     <div id="side-panel">
-        <div class="seat-area">
-            <button id="s1" class="btn-seat" onclick="sit('p1')">#1 Selecione o lugar</button>
-            <button id="s2" class="btn-seat" onclick="sit('p2')">#2 Selecione o lugar</button>
+        <div class="seat-box">
+            <button id="p1-btn" class="btn-seat" onclick="sentar('p1')">#1 Selecione o lugar</button>
+            <button id="p2-btn" class="btn-seat" onclick="sentar('p2')">#2 Selecione o lugar</button>
         </div>
-        
-        <div style="display:flex; font-size:12px; border-bottom:1px solid #777;">
-            <div style="flex:1; background:#fff; padding:5px; text-align:center;">chat</div>
-            <div style="flex:1; padding:5px; text-align:center;">usuários</div>
-        </div>
-
         <div id="chat-box">
-            <div id="chat-msgs"></div>
-            <input type="text" id="chat-in" placeholder="Escrever..." onkeypress="send(event)">
+            <div id="msgs"></div>
+            <input type="text" id="chat-in" placeholder="Enviar mensagem..." onkeypress="enviarChat(event)">
         </div>
     </div>
 </div>
@@ -97,105 +93,106 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    let myID = "Player_" + Math.floor(Math.random() * 999);
-    let curRoom = null, curData = null, selIdx = null;
+    let meuID = "User_" + Math.floor(Math.random() * 999);
+    let salaAtiva = null;
+    let dadosSala = null;
+    let selecionado = null;
 
-    // Inicializar Lobby
+    // Monitorar Lobby
     db.ref('rooms').on('value', snap => {
-        const list = document.getElementById('room-list');
-        list.innerHTML = "";
-        snap.forEach(room => {
+        const lista = document.getElementById('lista-salas');
+        lista.innerHTML = "";
+        if(!snap.exists()) {
+            lista.innerHTML = "<p style='text-align:center; color:#666;'>Nenhuma mesa ativa.</p>";
+            return;
+        }
+        snap.forEach(mesa => {
             const div = document.createElement('div');
-            div.style = "padding:15px; border-bottom:1px solid #333; cursor:pointer;";
-            div.innerText = "Mesa #" + room.key.slice(-3);
-            div.onclick = () => join(room.key);
-            list.appendChild(div);
+            div.style = "padding:15px; border-bottom:1px solid #333; cursor:pointer; background:#222; margin-bottom:5px;";
+            div.innerText = "Mesa #" + mesa.key.slice(-4);
+            div.onclick = () => entrarNaMesa(mesa.key);
+            lista.appendChild(div);
         });
     });
 
-    function createTable() {
+    function criarMesa() {
         const id = "mesa_" + Date.now();
-        const b = Array(64).fill(null);
-        for(let i=0; i<64; i++){
+        const tab = Array(64).fill(null);
+        for(let i=0; i<64; i++) {
             let r=Math.floor(i/8), c=i%8;
-            if((r+c)%2==0){
-                if(r<3) b[i] = 'b';
-                if(r>4) b[i] = 'w';
+            if((r+c)%2==0) {
+                if(r<3) tab[i] = 'r'; // r = red
+                if(r>4) tab[i] = 'w'; // w = white
             }
         }
-        db.ref('rooms/' + id).set({ board: b, p1: null, p2: null }).then(() => join(id));
+        db.ref('rooms/' + id).set({ board: tab, p1: null, p2: null }).then(() => entrarNaMesa(id));
     }
 
-    function join(id) {
-        curRoom = id;
+    function entrarNaMesa(id) {
+        salaAtiva = id;
         document.getElementById('lobby').style.display = 'none';
         db.ref('rooms/' + id).on('value', snap => {
-            curData = snap.val();
-            render();
+            dadosSala = snap.val();
+            desenharTabuleiro();
         });
-        db.ref('chats/'+id).on('child_added', snap => {
+        db.ref('chats/' + id).on('child_added', snap => {
             const m = snap.val();
-            document.getElementById('chat-msgs').innerHTML += `<div><b>${m.u}:</b> ${m.t}</div>`;
-            document.getElementById('chat-msgs').scrollTop = 9999;
+            document.getElementById('msgs').innerHTML += `<div><b>${m.u}:</b> ${m.t}</div>`;
+            document.getElementById('msgs').scrollTop = 9999;
         });
     }
 
-    function render() {
+    function desenharTabuleiro() {
         const bDiv = document.getElementById('board');
         bDiv.innerHTML = "";
-        curData.board.forEach((p, i) => {
+        dadosSala.board.forEach((p, i) => {
+            const r = Math.floor(i/8), c = i%8;
             const sq = document.createElement('div');
-            sq.className = `sq ${(Math.floor(i/8)+(i%8))%2==0?'dark':'light'} ${selIdx===i?'sel':''}`;
-            if(p){
+            sq.className = `sq ${(r+c)%2==0?'dark':'light'} ${selecionado===i?'sel':''}`;
+            if(p) {
                 const pc = document.createElement('div');
-                pc.className = `piece ${p==='w'?'white':'black'}`;
+                pc.className = `piece ${p==='w'?'white':'red'}`;
                 sq.appendChild(pc);
             }
-            sq.onclick = () => clickSq(i);
+            sq.onclick = () => clicarCasa(i);
             bDiv.appendChild(sq);
         });
-        // Atualizar Botões de Lugar
-        btnSeat('s1', curData.p1, 'p1');
-        btnSeat('s2', curData.p2, 'p2');
+        
+        // Atualizar botões de lugar
+        document.getElementById('p1-btn').innerText = dadosSala.p1 ? (dadosSala.p1===meuID ? "VOCÊ (#1)" : "OCUPADO") : "#1 Selecione o lugar";
+        document.getElementById('p2-btn').innerText = dadosSala.p2 ? (dadosSala.p2===meuID ? "VOCÊ (#2)" : "OCUPADO") : "#2 Selecione o lugar";
     }
 
-    function btnSeat(id, p, slot) {
-        const el = document.getElementById(id);
-        if(p) {
-            el.innerText = p === myID ? "VOCÊ ESTÁ AQUI" : "OCUPADO";
-            el.className = "btn-seat occupied";
-        } else {
-            el.innerText = "#" + (slot==='p1'?'1':'2') + " Selecione o lugar";
-            el.className = "btn-seat";
+    function sentar(lugar) {
+        if(!dadosSala[lugar]) db.ref('rooms/'+salaAtiva+'/'+lugar).set(meuID);
+    }
+
+    function clicarCasa(i) {
+        if(dadosSala.p1 !== meuID && dadosSala.p2 !== meuID) return; // Espectador
+        
+        if(dadosSala.board[i]) {
+            selecionado = i;
+        } else if(selecionado !== null) {
+            const novoTab = [...dadosSala.board];
+            novoTab[i] = novoTab[selecionado];
+            novoTab[selecionado] = null;
+            db.ref('rooms/'+salaAtiva+'/board').set(novoTab);
+            selecionado = null;
         }
+        desenharTabuleiro();
     }
 
-    function sit(p) { if(!curData[p]) db.ref('rooms/'+curRoom+'/'+p).set(myID); }
-
-    function clickSq(i) {
-        if(curData.p1 !== myID && curData.p2 !== myID) return; // Espectador
-        if(curData.board[i]) {
-            selIdx = i;
-        } else if(selIdx !== null) {
-            const b = [...curData.board];
-            b[i] = b[selIdx]; b[selIdx] = null;
-            db.ref('rooms/'+curRoom+'/board').set(b);
-            selIdx = null;
-        }
-        render();
-    }
-
-    function send(e) {
+    function enviarChat(e) {
         if(e.key === 'Enter') {
-            const i = document.getElementById('chat-in');
-            db.ref('chats/'+curRoom).push({ u: myID, t: i.value });
-            i.value = "";
+            const input = document.getElementById('chat-in');
+            db.ref('chats/'+salaAtiva).push({ u: meuID, t: input.value });
+            input.value = "";
         }
     }
 
-    function action(t) {
-        if(confirm("Deseja " + t + "?")) {
-            db.ref('chats/'+curRoom).push({ u: "SISTEMA", t: myID + " solicitou " + t });
+    function avisar(msg) {
+        if(confirm("Deseja " + msg + "?")) {
+            db.ref('chats/'+salaAtiva).push({ u: "SISTEMA", t: meuID + " pediu " + msg });
         }
     }
 </script>
