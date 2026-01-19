@@ -3,50 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MOZDAMAS FIX</title>
+    <title>MOZDAMAS FINAL FIX</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
         body { background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; margin: 0; }
-        #lobby { padding: 50px; }
-        .btn-principal { background: #fbbf24; color: black; padding: 20px; border: none; font-weight: bold; width: 80%; cursor: pointer; }
+        #lobby { padding: 20px; display: block; }
+        #game-screen { display: none; background: #e0e0e0; min-height: 100vh; padding: 10px; color: #333; }
         
-        /* O TABULEIRO - Forçando visibilidade */
-        #game-screen { display: none; padding: 10px; background: #e0e0e0; min-height: 100vh; }
+        /* TABULEIRO FORÇADO */
         #board { 
             display: grid; 
-            grid-template-columns: repeat(8, 45px); 
+            grid-template-columns: repeat(8, 12.5%); 
             grid-template-rows: repeat(8, 45px); 
-            gap: 0; 
+            width: 360px; 
+            height: 360px; 
             border: 5px solid #333; 
-            margin: 20px auto;
-            width: 360px;
-            height: 360px;
+            margin: 10px auto; 
+            background: #444; /* Fundo de segurança caso as casas falhem */
         }
-        .sq { width: 45px; height: 45px; display: flex; justify-content: center; align-items: center; }
+        @media (max-width: 400px) {
+            #board { width: 90vw; height: 90vw; grid-template-rows: repeat(8, 11.25vw); }
+        }
+
+        .sq { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
         .dark { background: #769656 !important; } 
         .light { background: #eeeed2 !important; }
-        .piece { width: 35px; height: 35px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.2); }
+        
+        .piece { width: 80%; height: 80%; border-radius: 50%; box-shadow: 0 4px 0 rgba(0,0,0,0.3); }
         .w { background: white; }
-        .r { background: #e53935; }
-        #controles { color: black; font-weight: bold; }
+        .r { background: #e53935; } /* Peças vermelhas estilo PlayOK */
+
+        .btn-play { background: #fbbf24; color: black; padding: 20px; border: none; font-weight: bold; width: 90%; font-size: 18px; cursor: pointer; border-radius: 8px; }
     </style>
 </head>
 <body>
 
     <div id="lobby">
-        <h1>MOZDAMAS</h1>
-        <button class="btn-principal" onclick="iniciarNovoJogo()">CLIQUE AQUI PARA CRIAR MESA</button>
-        <div id="status"></div>
+        <h2 style="color:#fbbf24">MOZDAMAS ARENA</h2>
+        <button class="btn-play" onclick="entrarNaMesa()">ENTRAR NA MESA ATIVA</button>
+        <p style="color: #666; margin-top: 20px;">Se o ecrã ficar cinzento, recarregue a página.</p>
     </div>
 
     <div id="game-screen">
-        <button onclick="location.reload()" style="float: left;">SAIR</button>
+        <div style="display:flex; justify-content: space-between; align-items: center;">
+            <button onclick="location.reload()">SAIR</button>
+            <b id="status-mesa">MESA #101</b>
+        </div>
+
         <div id="board"></div>
-        <div id="controles">
-            <p>MESA ATIVA</p>
-            <button onclick="sentar('p1')">SENTAR LUGAR #1</button>
-            <button onclick="sentar('p2')">SENTAR LUGAR #2</button>
+
+        <div id="ui-jogo">
+            <div style="display:flex; gap:5px; margin-bottom: 10px;">
+                <button style="flex:1" onclick="sentar('p1')">SENTAR #1</button>
+                <button style="flex:1" onclick="sentar('p2')">SENTAR #2</button>
+            </div>
+            <div style="background: white; border: 1px solid #999; height: 100px; padding: 5px; font-size: 12px; text-align: left; overflow-y: auto;">
+                SISTEMA: Bem-vindo ao MozDamas.
+            </div>
         </div>
     </div>
 
@@ -59,51 +73,60 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    let salaID = "mesa_teste_1";
-    let meuID = "User_" + Math.floor(Math.random()*999);
+    
+    const ID_MESA = "mesa_global_01";
+    let meuID = "Player_" + Math.floor(Math.random() * 999);
 
-    function iniciarNovoJogo() {
-        // Criar tabuleiro inicial
-        let b = Array(64).fill(null);
-        for(let i=0; i<64; i++) {
-            let r=Math.floor(i/8), c=i%8;
-            if((r+c)%2==0) {
-                if(r<3) b[i] = 'r';
-                if(r>4) b[i] = 'w';
+    function entrarNaMesa() {
+        document.getElementById('lobby').style.display = 'none';
+        document.getElementById('game-screen').style.display = 'block';
+        
+        // Criar tabuleiro inicial se não existir
+        db.ref('rooms/' + ID_MESA).once('value', snap => {
+            if (!snap.exists()) {
+                let b = Array(64).fill(null);
+                for(let i=0; i<64; i++) {
+                    let r=Math.floor(i/8), c=i%8;
+                    if((r+c)%2==0) {
+                        if(r<3) b[i] = 'r';
+                        if(r>4) b[i] = 'w';
+                    }
+                }
+                db.ref('rooms/' + ID_MESA).set({ board: b, p1: null, p2: null });
             }
-        }
-        // Gravar no Firebase e entrar
-        db.ref('rooms/' + salaID).set({ board: b, p1: null, p2: null }).then(() => {
-            document.getElementById('lobby').style.display = 'none';
-            document.getElementById('game-screen').style.display = 'block';
-            escutarJogo();
+        });
+
+        // Escutar atualizações
+        db.ref('rooms/' + ID_MESA).on('value', snap => {
+            const dados = snap.val();
+            if (dados && dados.board) {
+                desenhar(dados.board);
+            }
         });
     }
 
-    function escutarJogo() {
-        db.ref('rooms/' + salaID).on('value', snap => {
-            const dados = snap.val();
-            const bDiv = document.getElementById('board');
-            bDiv.innerHTML = "";
+    function desenhar(tabuleiro) {
+        const bDiv = document.getElementById('board');
+        if (!bDiv) return;
+        bDiv.innerHTML = "";
+        
+        tabuleiro.forEach((p, i) => {
+            const r = Math.floor(i/8), c = i%8;
+            const sq = document.createElement('div');
+            sq.className = `sq ${(r+c)%2==0 ? 'dark' : 'light'}`;
             
-            dados.board.forEach((p, i) => {
-                const r = Math.floor(i/8), c = i%8;
-                const sq = document.createElement('div');
-                sq.className = `sq ${(r+c)%2==0 ? 'dark' : 'light'}`;
-                if(p) {
-                    const pc = document.createElement('div');
-                    pc.className = `piece ${p}`;
-                    sq.appendChild(pc);
-                }
-                bDiv.appendChild(sq);
-            });
+            if(p) {
+                const pc = document.createElement('div');
+                pc.className = `piece ${p}`;
+                sq.appendChild(pc);
+            }
+            
+            sq.onclick = () => console.log("Clicou em " + i);
+            bDiv.appendChild(sq);
         });
     }
 
     function sentar(p) {
-        db.ref('rooms/'+salaID+'/'+p).set(meuID);
-        alert("Sentou no lugar " + p);
-    }
-</script>
-</body>
-</html>
+        db.ref('rooms/'+ID_MESA+'/'+p).set(meuID);
+        alert("Agora
+    
