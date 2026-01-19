@@ -17,7 +17,7 @@
             --warning: #f1c40f;
         }
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
         body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
         #top-bar { background: #111; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; height: 50px; border-bottom: 1px solid #333; }
@@ -38,40 +38,30 @@
         }
         .hidden { display: none !important; }
 
-        .modal-title { font-size: 2rem; color: var(--accent); margin-bottom: 10px; }
-
         .square { width: 100%; height: 100%; position: relative; display: flex; justify-content: center; align-items: center; }
         .dark-sq { background-color: var(--board-dark); }
         .light-sq { background-color: var(--board-light); }
-        .piece { position: absolute; width: 80%; height: 80%; border-radius: 50%; z-index: 2; box-shadow: 0 4px 4px rgba(0,0,0,0.4); pointer-events: none; transition: all 0.3s ease; }
+        .piece { position: absolute; width: 80%; height: 80%; border-radius: 50%; z-index: 2; box-shadow: 0 4px 4px rgba(0,0,0,0.4); pointer-events: none; }
         .white { background: var(--white-p); border: 1px solid #999; }
         .black { background: var(--black-p); border: 1px solid #333; }
         .king::after { content: '👑'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 20px; }
+        
         .selected { transform: scale(1.1); outline: 4px solid var(--warning); z-index: 10; }
-        .hint { position: absolute; width: 35%; height: 35%; background: rgba(0, 255, 0, 0.4); border-radius: 50%; z-index: 1; }
-
-        #side-menu { position: fixed; top: 0; right: -280px; width: 280px; height: 100%; background: var(--panel); box-shadow: -5px 0 15px rgba(0,0,0,0.5); transition: 0.3s; z-index: 1000; padding: 20px; display: flex; flex-direction: column; gap: 8px; }
-        #side-menu.open { right: 0; }
-        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; z-index: 999; }
+        .hint { position: absolute; width: 35%; height: 35%; background: rgba(0, 255, 0, 0.4); border-radius: 50%; z-index: 1; pointer-events: none; }
 
         .timer { font-family: monospace; font-size: 1.6rem; background: #000; padding: 5px; text-align: center; border-radius: 4px; color: #444; border: 2px solid #333; }
         .timer.active { color: var(--accent); border-color: var(--accent); }
-        #status-bar { grid-column: span 2; text-align: center; color: var(--warning); font-weight: bold; font-size: 0.9rem; margin-top: 5px; }
+        #status-bar { grid-column: span 2; text-align: center; color: var(--warning); font-weight: bold; font-size: 0.9rem; }
         
-        .menu-btn { width: 100%; padding: 12px; background: #333; border: 1px solid #444; color: white; cursor: pointer; border-radius: 4px; font-weight: bold; }
-        .btn-start { background: var(--accent); color: black; margin-top: 15px; }
+        .menu-btn { width: 100%; padding: 12px; background: #333; border: 1px solid #444; color: white; border-radius: 4px; font-weight: bold; margin-top: 10px; }
+        .btn-start { background: var(--accent); color: black; }
     </style>
 </head>
 <body>
 
-    <div id="overlay" onclick="window.toggleMenu()"></div>
-
     <div id="top-bar">
         <div id="host-name" style="font-weight: bold; color: var(--accent);">👑 VOCÊ</div>
-        <div class="viewer-count">
-            <span class="dot"></span> <span id="view-count-top">1</span> online
-        </div>
-        <div onclick="window.toggleMenu()" style="cursor:pointer; font-size: 24px;">⋮</div>
+        <div class="viewer-count"><span class="dot"></span> <span id="view-count">1</span> online</div>
     </div>
 
     <div id="game-info">
@@ -88,16 +78,10 @@
 
     <div id="board-wrapper">
         <div id="lobby-overlay">
-            <h2 class="modal-title">SALA DE ESPERA</h2>
-            <button class="menu-btn btn-start" onclick="window.iniciarLobby()">INICIAR PARTIDA ONLINE</button>
+            <h2 style="color: var(--accent)">SALA DE ESPERA</h2>
+            <button class="menu-btn btn-start" onclick="window.iniciarLobby()">INICIAR PARTIDA</button>
         </div>
         <div id="board"></div>
-    </div>
-
-    <div id="side-menu">
-        <h3 style="border-bottom: 1px solid #444; padding-bottom: 10px;">Opções</h3>
-        <button class="menu-btn" onclick="location.reload()">Reiniciar App</button>
-        <button class="menu-btn" style="background: var(--danger); margin-top: auto;" onclick="window.resetGame()">Limpar Banco (Reset)</button>
     </div>
 
 <script type="module">
@@ -126,7 +110,6 @@
     let gameStarted = false;
     let timers = { white: 300, black: 300 };
 
-    // --- INICIALIZAÇÃO LOCAL ---
     window.init = function() {
         const boardEl = document.getElementById('board');
         boardEl.innerHTML = '';
@@ -138,49 +121,37 @@
                 const sq = document.createElement('div');
                 sq.className = `square ${(r+c)%2===0?'dark-sq':'light-sq'}`;
                 sq.id = `sq-${r}-${c}`;
-                sq.onclick = () => window.handleClick(r, c);
+                
+                // Melhor suporte para mobile
+                const handleEvent = (e) => {
+                    e.preventDefault();
+                    handleInteraction(r, c);
+                };
+                sq.addEventListener('click', handleEvent);
+                sq.addEventListener('touchstart', handleEvent, {passive: false});
+                
                 boardEl.appendChild(sq);
             }
         }
         render();
     };
 
-    // --- SINCRONIZAÇÃO FIREBASE ---
-    onValue(gameRef, (snapshot) => {
-        const data = snapshot.val();
-        if (!data || !data.board) {
-            window.init();
-            set(gameRef, { board, turn, timers, gameActive: false, gameStarted: false });
-            return;
-        }
-        board = data.board;
-        turn = data.turn;
-        timers = data.timers || { white: 300, black: 300 };
-        gameActive = data.gameActive;
-        gameStarted = data.gameStarted;
-
-        document.getElementById('lobby-overlay').classList.toggle('hidden', gameStarted);
-        document.getElementById('status-bar').innerText = gameActive ? (turn === 'white' ? "BRANCAS JOGAM" : "PRETAS JOGAM") : "CONECTADO";
-        
-        updateLogic();
-        render();
-    });
-
-    window.iniciarLobby = () => update(gameRef, { gameActive: true, gameStarted: true });
-    window.resetGame = () => set(gameRef, null).then(() => location.reload());
-
-    // --- LÓGICA DE MOVIMENTAÇÃO ---
-    window.handleClick = function(r, c) {
+    function handleInteraction(r, c) {
         if (!gameActive) return;
         const p = board[r][c];
-        if (p?.color === turn) {
+
+        if (p && p.color === turn) {
             selectedSq = { r, c };
-        } else if (selectedSq && !p) {
+        } else if (selectedSq) {
             const move = legalMoves.find(m => m.fr === selectedSq.r && m.fc === selectedSq.c && m.tr === r && m.tc === c);
-            if (move) executeMove(move);
+            if (move) {
+                executeMove(move);
+            } else {
+                selectedSq = null;
+            }
         }
         render();
-    };
+    }
 
     function executeMove(move) {
         const p = board[move.fr][move.fc];
@@ -193,6 +164,22 @@
         selectedSq = null;
         update(gameRef, { board, turn, timers });
     }
+
+    onValue(gameRef, (snapshot) => {
+        const data = snapshot.val();
+        if (!data) return;
+        board = data.board;
+        turn = data.turn;
+        timers = data.timers || {white: 300, black: 300};
+        gameActive = data.gameActive;
+        gameStarted = data.gameStarted;
+
+        document.getElementById('lobby-overlay').classList.toggle('hidden', gameStarted);
+        document.getElementById('status-bar').innerText = turn === 'white' ? "VEZ DAS BRANCAS" : "VEZ DAS PRETAS";
+        
+        updateLogic();
+        render();
+    });
 
     function updateLogic() {
         let caps = [];
@@ -221,23 +208,8 @@
         legalMoves = caps.length > 0 ? caps : normals;
     }
 
-    // --- CRONÔMETRO ---
-    setInterval(() => {
-        if (!gameActive || !gameStarted) return;
-        if (turn === 'white') timers.white--; else timers.black--;
-        
-        const format = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
-        document.getElementById('timer-white').innerText = format(timers.white);
-        document.getElementById('timer-black').innerText = format(timers.black);
-        
-        if (timers.white <= 0 || timers.black <= 0) {
-            alert("Fim de tempo!");
-            window.resetGame();
-        }
-    }, 1000);
-
     function render() {
-        let w = 0, b = 0;
+        let w=0, b=0;
         for (let r = 0; r < 8; r++) {
             for (let c = 0; c < 8; c++) {
                 const sq = document.getElementById(`sq-${r}-${c}`);
@@ -257,16 +229,23 @@
         }
         document.getElementById('count-white').innerText = w;
         document.getElementById('count-black').innerText = b;
-        document.getElementById('timer-white').classList.toggle('active', turn === 'white');
-        document.getElementById('timer-black').classList.toggle('active', turn === 'black');
     }
 
-    window.toggleMenu = () => {
-        document.getElementById('side-menu').classList.toggle('open');
-        document.getElementById('overlay').style.display = document.getElementById('side-menu').classList.contains('open') ? 'block' : 'none';
-    };
-
+    window.iniciarLobby = () => update(gameRef, { gameActive: true, gameStarted: true });
+    
+    // Inicia o tabuleiro localmente ao carregar
     window.init();
+
+    // Contador de tempo
+    setInterval(() => {
+        if (!gameActive || !gameStarted) return;
+        if (turn === 'white') timers.white--; else timers.black--;
+        const format = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+        document.getElementById('timer-white').innerText = format(timers.white);
+        document.getElementById('timer-black').innerText = format(timers.black);
+        document.getElementById('timer-white').classList.toggle('active', turn === 'white');
+        document.getElementById('timer-black').classList.toggle('active', turn === 'black');
+    }, 1000);
 </script>
 </body>
 </html>
